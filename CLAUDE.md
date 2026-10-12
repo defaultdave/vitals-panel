@@ -10,8 +10,6 @@ A plain-JavaScript library: a Core Web Vitals debugging overlay built on `web-vi
 
 Gates, in order: `npm run build && npm run lint && npm run typecheck && npm test`.
 
-Standards: `.claude/standards/stack-decisions.md` settles the rules that adapt per project, and `.claude/standards/architecture.md` replaces the default layer rules. `.claude/` is local and not in the repository.
-
 ## Layout
 
 | Path | What lives there |

@@ -4,7 +4,7 @@ A drop-in overlay for performance debugging. It shows the Core Web Vitals for th
 
 Plain JavaScript, shipped as an ES module: one import, no framework, and no stylesheet to add. It works the same in a React app, a Next.js app or a static page.
 
-Built on Google's [`web-vitals`](https://github.com/GoogleChrome/web-vitals) library, attribution build. It started as the panel in `react-perf-pitfalls`.
+Built on Google's [`web-vitals`](https://github.com/GoogleChrome/web-vitals) library, attribution build.
 
 Everything it shows is a lab reading: one page view, on this device. It is not field data.
 
