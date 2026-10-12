@@ -1,0 +1,22 @@
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+main {
+  max-width: 40rem;
+  padding: 1rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.banner {
+  padding: 2rem 1rem;
+  background: #fde68a;
+}

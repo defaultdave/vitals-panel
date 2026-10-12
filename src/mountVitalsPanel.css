@@ -1,0 +1,144 @@
+/*
+ * The panel's stylesheet. The build inlines it into the JavaScript as a string,
+ * and mountVitalsPanel.ts gives it to the panel's shadow root, so these rules
+ * and the page's rules never meet.
+ */
+
+/*
+ * The host is the one element the page's rules can reach, and a page rule wins
+ * over a :host rule unless the :host rule is important. `all` comes first: it
+ * also stops the page's inherited text styles at the boundary.
+ */
+:host {
+  all: initial !important;
+  position: fixed !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  z-index: 2147483000 !important;
+}
+
+.panel {
+  width: 320px;
+  /* 44px: the 12px on each side of the panel and its own padding. */
+  max-width: calc(100vw - 44px);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #111;
+  color: #eee;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}
+
+.bar,
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.heading {
+  margin: 8px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid #555;
+  color: #aaa;
+}
+
+.toggle {
+  all: unset;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.action {
+  all: unset;
+  padding: 0 6px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+}
+
+.action:hover {
+  border-color: #aaa;
+}
+
+.toggle:focus-visible,
+.action:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
+}
+
+/* Fixed width and start-aligned, so "Copy" turning into "Copied" moves nothing. */
+.copy {
+  min-width: 6ch;
+}
+
+.list {
+  margin: 6px 0 0;
+}
+
+.metric {
+  padding: 4px 0;
+  border-top: 1px solid #333;
+}
+
+/*
+ * Two fixed columns, and every value starts at the same left edge. Text that is
+ * right-aligned or centered moves its own start whenever its length changes,
+ * and the browser counts that as a layout shift in the page being measured.
+ */
+.metric dt,
+.metric dd {
+  display: grid;
+  grid-template-columns: 25ch minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+
+.metric dd {
+  color: #aaa;
+}
+
+.metric dt span,
+.metric dd span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value[data-rating="good"] {
+  color: #4ade80;
+}
+
+.value[data-rating="needs-improvement"] {
+  color: #fbbf24;
+}
+
+.value[data-rating="poor"] {
+  color: #f87171;
+}
+
+.value[data-rating="none"] {
+  color: #8c8c8c;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The textarea the copy fallback selects from. Out of the flow so it shifts nothing. */
+.copyBuffer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+}

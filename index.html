@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vitals-panel demo</title>
+    <link rel="stylesheet" href="/demo/demo.css" />
+  </head>
+  <body>
+    <p id="banner" class="banner" hidden>A late banner that pushes the page down.</p>
+    <main>
+      <h1 id="title">vitals-panel demo</h1>
+      <p>Clicks counted: <output id="count">0</output></p>
+      <ul class="controls">
+        <li><button type="button" id="fast">Fast click</button></li>
+        <li><button type="button" id="slow" data-block-ms="300">Slow click (300 ms)</button></li>
+        <li><button type="button" id="shift">Shift the layout</button></li>
+        <li><button type="button" id="route">Change route</button></li>
+      </ul>
+    </main>
+    <script type="module" src="/demo/main.ts"></script>
+  </body>
+</html>
