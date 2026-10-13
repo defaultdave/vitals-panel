@@ -69,6 +69,7 @@ function adoptStyles(root: ShadowRoot) {
 }
 
 // The button opens the note without any script: `popovertarget` names it, and the browser closes it on Escape or a click elsewhere.
+// The id only has to be unique in this panel's shadow root, which is where the browser looks it up.
 function infoFor(name: string, about: string): [button: HTMLElement, note: HTMLElement] {
   const id = `about-${name.replaceAll(" ", "-")}`;
   return [
@@ -117,7 +118,7 @@ function metricList(views: MetricView[]): [list: HTMLElement, fill: Fill<MetricV
  *
  * "Page view" is Google's `web-vitals` library, attribution build: TTFB, FCP,
  * LCP, INP and CLS as Chrome defines them. INP and CLS there are the worst seen
- * so far, so they only ever go up, and they restart on a navigation.
+ * so far, so a good reading after a bad one changes nothing, and they restart on a navigation.
  *
  * "Since reset" is the panel's own window over the same browser entries: the
  * last interaction, the worst one, the longest long animation frame and the

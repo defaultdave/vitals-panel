@@ -71,6 +71,13 @@ describe("scriptsDuring", () => {
     expect(scriptsDuring([frame({ startTime: 5000 })], span)).toBeUndefined();
   });
 
+  it.each([
+    ["ends exactly when the span starts", frame({ startTime: 1690, duration: 310 })],
+    ["starts exactly when the span ends", frame({ startTime: 2304 })],
+  ])("counts a frame that %s, as web-vitals does", (_, touching) => {
+    expect(scriptsDuring([touching], span)).toBeDefined();
+  });
+
   it("splits a script's time into script and the style and layout it forced, and adds the frame's own", () => {
     const thrashing = script({ forcedStyleAndLayoutDuration: 60 });
     // The frame ends at 2313, so its own style and layout took 5 ms.

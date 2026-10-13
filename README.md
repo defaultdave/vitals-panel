@@ -29,11 +29,11 @@ A [long animation frame](https://developer.chrome.com/docs/web-platform/long-ani
 |---|---|---|
 | Page view, INP | `longest script`, `script time`, `style and layout` | From `web-vitals`: the script that ran longest during the INP interaction, and the totals for it. Marked `(panel)` when the panel filled them in |
 | Since reset, last interaction | `longest script`, `its invoker`, `script time`, `forced style and layout` | The same for the last interaction, worked out by the panel. Script time leaves out the style and layout that the scripts forced, as `web-vitals` does |
-| Since reset, worst frame | `blocking duration`, `longest script`, `its invoker` | The longest frame in the window, whether or not an interaction caused it. Blocking duration is the part of each task past 50 ms |
+| Since reset, worst frame | `blocking duration`, `longest script`, `its invoker` | The longest frame in the window, whether or not an interaction caused it. Blocking duration is the part of each task past 50 ms, after the frame's rendering time is added to its longest task |
 
 A script reads `main.ts@988 save (http://localhost:5173/demo/main.ts)`: the file, a character offset into it (not a line number), the function's name when it has one, and the full URL. The invoker is how the browser entered the script, for example `BUTTON#slow.onclick` or `Window.requestAnimationFrame`. The panel cuts a long value off, so hover over it or press Copy to read it in full.
 
-The browser does not say which interaction a frame belongs to. The panel matches them by time, with the rule `web-vitals` uses: a frame belongs to an interaction when it overlaps the time from the interaction's start to the end of its event handlers.
+The browser does not say which interaction a frame belongs to. The panel matches them by time, with the rule `web-vitals` uses: a frame belongs to an interaction when it overlaps or touches the time from the interaction's start to the end of its event handlers.
 
 `web-vitals` reports INP once per value, and in Chromium 152 the browser can deliver the interaction's frame a few milliseconds later (4 ms, when measured on the demo page). The library then has no frame to read, and it does not report the same value twice. When that happens the panel works the three INP lines out from its own frames, with the same rule, and marks each value: `script time: 300 ms (panel)`. A value without the mark is what `web-vitals` wrote. Nothing else in "Page view" comes from the panel.
 
@@ -97,7 +97,7 @@ The types come with the package: `VitalsPanelOptions` for the options above, `Vi
 |---|---|
 | Elements | One `<vitals-panel>` element at the end of `<body>`. Everything else is in its shadow root |
 | Styles | Bundled in the JavaScript and given to the shadow root as a constructed stylesheet. The page's CSS does not reach the panel and the panel's does not reach the page. No `<style>` element and no `style` attributes, so a Content Security Policy without `unsafe-inline` allows it |
-| Size | `dist/index.js` is 22.0 kB, 7.7 kB gzipped, stylesheet included (0.2.0 with the long animation frame rows and the descriptions) |
+| Size | `dist/index.js` is 22.1 kB, 7.8 kB gzipped, stylesheet included (0.2.0 with the long animation frame rows and the descriptions) |
 | Dependencies | `web-vitals` 6, attribution build (5.6 kB gzipped). It stays an import, so an app that already uses `web-vitals` loads one copy |
 | Observers | One set per page, started by the first mount or subscription. They keep running after `unmount()`, because `web-vitals` has no unsubscribe |
 | Work | An update changes the text of the cells whose value changed. A collapsed panel does none and catches up when it opens |

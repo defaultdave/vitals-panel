@@ -9,7 +9,7 @@ import { ms } from "./rows";
 /** The two sections of the panel. */
 export const SECTION_ABOUT = {
   page:
-    "Core Web Vitals for this page view, from Google's web-vitals library. INP and CLS are the worst so far, so they only go up. Restarts on a navigation.",
+    "Core Web Vitals for this page view, from Google's web-vitals library. INP and CLS report the worst so far, so a fast interaction after a slow one changes nothing. Restarts on a navigation.",
   live:
     "The panel's own reading of the same browser entries since Reset was last pressed. Press Reset, interact, and read one change at a time. The number is how many interactions were counted.",
 };
@@ -25,6 +25,6 @@ export const ROW_ABOUT: Record<string, string> = {
     "The most recent click, tap or key press, from the input to the next frame on screen, rated on the INP scale. 1 is the wait for the main thread, 2 is the event handlers, 3 is the rendering. The script lines name the script that ran longest during it, when a frame took over 50 ms.",
   "worst interaction": "The slowest interaction since the reset. Copy includes its parts and its script.",
   "worst frame":
-    "The longest long animation frame since the reset: a frame that took over 50 ms from its first task to the end of its rendering, with or without an interaction. Blocking duration is the part of each task past 50 ms. A frame has no rating.",
+    "The longest long animation frame since the reset: a frame that took over 50 ms from its first task to the end of its rendering, with or without an interaction. Blocking duration is the part of each task past 50 ms, after the frame's rendering time is added to its longest task. A frame has no rating.",
   "layout shift": "The largest burst of layout shifts since the reset, scored the way CLS is.",
 };

@@ -198,13 +198,14 @@ export function addPageFrames(page: PageReading, entries: FrameEntry[]): PageRea
 export function applyMetric(page: PageReading, metric: VitalsMetric): PageReading {
   const startTime = metric.navigationStartTime ?? 0;
   if (startTime < page.startTime) return page;
-  const rows = startTime > page.startTime ? {} : page.rows;
+  // A newer navigation starts without the rows of the one before, or the interaction its INP was waiting on.
+  const { rows, inpSpan } = startTime > page.startTime ? EMPTY_PAGE : page;
   return fillInpScripts({
     startTime,
     navigationType: metric.navigationType,
     url: metric.navigationURL,
     rows: { ...rows, [metric.name]: toRow(metric) },
-    inpSpan: metric.name === "INP" ? unnamedSpan(metric) : page.inpSpan,
+    inpSpan: metric.name === "INP" ? unnamedSpan(metric) : inpSpan,
     frames: page.frames,
   });
 }

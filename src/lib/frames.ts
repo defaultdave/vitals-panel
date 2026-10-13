@@ -32,7 +32,7 @@ export interface FrameEntry {
   duration: number;
   /** When the frame's own style and layout began, or 0 when it rendered nothing. */
   styleAndLayoutStart: number;
-  /** How long the frame kept input waiting: the part of each task past 50 ms. */
+  /** How long the frame kept input waiting: the part of each task past 50 ms, after the rendering time is added to the longest task. */
   blockingDuration: number;
   /** The `timeStamp` of the first event handled in the frame, or 0 when there was none. */
   firstUIEventTimestamp: number;
@@ -61,7 +61,8 @@ const FRAME_LIMIT = 10;
 const NO_SOURCE = "n/a";
 
 const endOf = (timed: { startTime: number; duration: number }) => timed.startTime + timed.duration;
-const overlaps = (frame: FrameEntry, span: Span) => frame.startTime < span.end && endOf(frame) > span.start;
+// Inclusive at both ends, as in `web-vitals`: a frame that only touches the span still counts.
+const overlaps = (frame: FrameEntry, span: Span) => frame.startTime <= span.end && endOf(frame) >= span.start;
 
 /**
  * Names a script's entry point, shortest part first, because the panel cuts a
@@ -102,7 +103,7 @@ export function withoutFramesAt(frames: FrameEntry[], eventTimes: readonly numbe
  * Drops old frames, and keeps any that a span still needs however old it is.
  * @param frames - Frames, oldest first.
  * @param spans - The spans whose frames must stay, such as the interactions on show.
- * @returns The newest 10 frames and every frame that overlaps a span, oldest first.
+ * @returns The newest 10 frames and every frame that overlaps or touches a span, oldest first.
  */
 export function keepFrames(frames: readonly FrameEntry[], spans: Span[]): FrameEntry[] {
   const newest = frames.slice(-FRAME_LIMIT);
@@ -116,7 +117,7 @@ export function keepFrames(frames: readonly FrameEntry[], spans: Span[]): FrameE
  * style and layout counts whole.
  * @param frames - Long animation frames, in any order.
  * @param span - The stretch of time to look at.
- * @returns The summary, or undefined when no frame overlaps the span: nothing in it took 50 ms.
+ * @returns The summary, or undefined when no frame overlaps or touches the span: nothing in it took 50 ms.
  */
 export function scriptsDuring(frames: readonly FrameEntry[], span: Span): ScriptSummary | undefined {
   const during = frames.filter((frame) => overlaps(frame, span));

@@ -68,6 +68,12 @@ describe("applyMetric", () => {
     expect(applyMetric(loaded, soft).rows).not.toHaveProperty("LCP");
   });
 
+  it("stops waiting on the last navigation's INP interaction when a newer navigation reports", () => {
+    const waiting = applyMetric(EMPTY_PAGE, slowInp());
+    expect(waiting.inpSpan).toEqual({ start: 2000, end: 2302 });
+    expect(applyMetric(waiting, metric({ name: "LCP", value: 300, navigationStartTime: 5000 })).inpSpan).toBeUndefined();
+  });
+
   it("drops a late report from the navigation before the current one", () => {
     const current = applyMetric(loaded, metric({ name: "LCP", value: 300, navigationStartTime: 5000 }));
     expect(applyMetric(current, metric({ name: "CLS", value: 0.2, navigationStartTime: 0 }))).toBe(current);
