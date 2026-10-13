@@ -1,12 +1,14 @@
 /**
- * The live reading: the panel's own window over raw Event Timing and
- * layout-shift entries, which the Reset button restarts.
+ * The live reading: the panel's own window over raw Event Timing, layout-shift
+ * and long-animation-frame entries, which the Reset button restarts.
  *
  * `web-vitals` cannot do this. Its INP and CLS are high-water marks for the
  * whole page view, it has no reset, and a second subscription replays the
  * browser's buffered entries. So this file keeps a separate, clearly labeled
  * reading. Pure reducers, no browser APIs.
  */
+import type { FrameEntry, ScriptSummary, Span } from "./frames";
+import { keepFrames, scriptsDuring } from "./frames";
 import type { Rating } from "./rows";
 
 /** The fields of a `PerformanceEventTiming` entry the live reading uses. */
@@ -54,6 +56,10 @@ export interface LiveReading {
   /** The largest layout-shift session window since the reset, scored the way CLS is. */
   shift: number;
   shiftWindow: { value: number; start: number; last: number };
+  /** The longest long animation frame since the reset. Frames under 50 ms are not reported by the browser. */
+  worstFrame: FrameEntry | undefined;
+  /** The newest frames, and the frames of `last` and `worst`, kept to name the scripts behind an interaction. */
+  frames: readonly FrameEntry[];
 }
 
 const RECENT_LIMIT = 10;
@@ -79,6 +85,8 @@ export function emptyLive(since: number): LiveReading {
     recent: new Map(),
     shift: 0,
     shiftWindow: { value: 0, start: 0, last: 0 },
+    worstFrame: undefined,
+    frames: [],
   };
 }
 
@@ -176,6 +184,36 @@ export function addShift(live: LiveReading, entry: ShiftEntry): LiveReading {
     ? { value: open.value + entry.value, start: open.start, last: entry.startTime }
     : { value: entry.value, start: entry.startTime, last: entry.startTime };
   return { ...live, shiftWindow, shift: Math.max(live.shift, shiftWindow.value) };
+}
+
+// The frames that `web-vitals` matches to an interaction: from its start to the end of its handlers.
+const handlingSpan = (i: Interaction): Span => ({ start: i.at, end: i.at + i.inputDelay + i.processing });
+
+/**
+ * Adds a batch of long animation frames to the window.
+ * @param live - The current reading.
+ * @param entries - Frames from one observer callback. Frames from before the window are skipped.
+ * @returns The next reading, or the same object when nothing counted.
+ */
+export function addFrames(live: LiveReading, entries: FrameEntry[]): LiveReading {
+  const counted = entries.filter((frame) => frame.startTime >= live.since);
+  if (counted.length === 0) return live;
+  const worstFrame = [...(live.worstFrame ? [live.worstFrame] : []), ...counted].reduce((a, b) =>
+    b.duration > a.duration ? b : a,
+  );
+  const onShow = [live.last, live.worst].flatMap((i) => (i ? [handlingSpan(i)] : []));
+  return { ...live, worstFrame, frames: keepFrames([...live.frames, ...counted], onShow) };
+}
+
+/**
+ * Finds the scripts behind an interaction. Frames and events arrive separately
+ * and in either order, so this is worked out when it is read, not stored.
+ * @param live - The current reading.
+ * @param interaction - Its last or worst interaction.
+ * @returns The summary, or undefined when no long animation frame overlaps the interaction.
+ */
+export function scriptsOf(live: LiveReading, interaction: Interaction): ScriptSummary | undefined {
+  return scriptsDuring(live.frames, handlingSpan(interaction));
 }
 
 /**

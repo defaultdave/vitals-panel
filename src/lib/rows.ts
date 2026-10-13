@@ -1,6 +1,12 @@
 /**
  * The page-load reading: turns each `web-vitals` metric into a display row and
- * keeps one set of rows per navigation. Pure functions, no browser APIs.
+ * keeps one set of rows per navigation.
+ *
+ * The rows are `web-vitals` output, with one exception. The library reports INP
+ * once per value, and the browser can deliver the interaction's long animation
+ * frame a few milliseconds later, which leaves the three script lines empty.
+ * The panel then fills them from its own frames and marks each value "(panel)".
+ * Pure functions, no browser APIs.
  */
 import type {
   CLSMetricWithAttribution,
@@ -9,6 +15,8 @@ import type {
   LCPMetricWithAttribution,
   TTFBMetricWithAttribution,
 } from "web-vitals/attribution";
+import type { FrameEntry, Span } from "./frames";
+import { describeSource, keepFrames, scriptsDuring } from "./frames";
 
 /** Any metric the attribution build of `web-vitals` reports. */
 export type VitalsMetric =
@@ -36,6 +44,10 @@ export interface PageReading {
   navigationType: string;
   url: string | undefined;
   rows: Record<string, Row>;
+  /** The INP interaction, from its start to the end of its handlers, while `web-vitals` has named no frame for it. */
+  inpSpan: Span | undefined;
+  /** The newest long animation frames, and the ones in `inpSpan`, kept to fill the INP row's script lines. */
+  frames: readonly FrameEntry[];
 }
 
 export const EMPTY_PAGE: PageReading = {
@@ -43,6 +55,8 @@ export const EMPTY_PAGE: PageReading = {
   navigationType: "navigate",
   url: undefined,
   rows: {},
+  inpSpan: undefined,
+  frames: [],
 };
 
 /** The rows of one section, in order, each with the labels of its detail lines. */
@@ -56,7 +70,19 @@ export const PAGE_LAYOUT: Layout = [
   ["TTFB", []],
   ["FCP", []],
   ["LCP", ["element", "1 time to first byte", "2 resource load delay", "3 resource load duration", "4 element render delay"]],
-  ["INP", ["target", "type", "1 input delay", "2 processing duration", "3 presentation delay", "script time", "style and layout"]],
+  [
+    "INP",
+    [
+      "target",
+      "type",
+      "1 input delay",
+      "2 processing duration",
+      "3 presentation delay",
+      "longest script",
+      "script time",
+      "style and layout",
+    ],
+  ],
   ["CLS", ["largest shift", "its value", "at"]],
 ];
 
@@ -100,6 +126,7 @@ export function toRow(metric: VitalsMetric): Row {
           ["1 input delay", ms(a.inputDelay)],
           ["2 processing duration", ms(a.processingDuration)],
           ["3 presentation delay", ms(a.presentationDelay)],
+          ["longest script", describeSource(a.longestScript?.entry)],
           ["script time", ms(a.totalScriptDuration)],
           ["style and layout", ms(a.totalStyleAndLayoutDuration)],
         ],
@@ -122,6 +149,44 @@ export function toRow(metric: VitalsMetric): Row {
   }
 }
 
+// Appended to a value the panel worked out, in a row that is otherwise `web-vitals` output.
+const PANEL_MARK = " (panel)";
+
+function unnamedSpan(metric: INPMetricWithAttribution): Span | undefined {
+  const a = metric.attribution;
+  // An INP with no event entry behind it has no time to match a frame against.
+  if (a.longAnimationFrameEntries.length > 0 || a.interactionTime === undefined) return undefined;
+  return { start: a.interactionTime, end: a.interactionTime + a.inputDelay + a.processingDuration };
+}
+
+function fillInpScripts(page: PageReading): PageReading {
+  const row = page.rows.INP;
+  const scripts = page.inpSpan && scriptsDuring(page.frames, page.inpSpan);
+  if (!row || !scripts) return page;
+  const filled = new Map([
+    ["longest script", describeSource(scripts.longest)],
+    ["script time", ms(scripts.scriptTime)],
+    ["style and layout", ms(scripts.styleAndLayout)],
+  ]);
+  const details = row.details.map(([label, value]): [string, string] => {
+    const own = filled.get(label);
+    return [label, own === undefined ? value : `${own}${PANEL_MARK}`];
+  });
+  return { ...page, rows: { ...page.rows, INP: { ...row, details } } };
+}
+
+/**
+ * Adds a batch of long animation frames to the page reading, and fills the INP
+ * row's script lines from them when `web-vitals` reported INP without a frame.
+ * @param page - The current reading.
+ * @param entries - Frames from one observer callback.
+ * @returns The next reading.
+ */
+export function addPageFrames(page: PageReading, entries: FrameEntry[]): PageReading {
+  const frames = keepFrames([...page.frames, ...entries], page.inpSpan ? [page.inpSpan] : []);
+  return fillInpScripts({ ...page, frames });
+}
+
 /**
  * Adds a reported metric to the page reading. A metric from a newer navigation
  * (a soft navigation or a bfcache restore) starts a fresh set of rows. A late
@@ -134,10 +199,12 @@ export function applyMetric(page: PageReading, metric: VitalsMetric): PageReadin
   const startTime = metric.navigationStartTime ?? 0;
   if (startTime < page.startTime) return page;
   const rows = startTime > page.startTime ? {} : page.rows;
-  return {
+  return fillInpScripts({
     startTime,
     navigationType: metric.navigationType,
     url: metric.navigationURL,
     rows: { ...rows, [metric.name]: toRow(metric) },
-  };
+    inpSpan: metric.name === "INP" ? unnamedSpan(metric) : page.inpSpan,
+    frames: page.frames,
+  });
 }

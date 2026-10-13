@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { FrameEntry } from "./frames";
 import type { TimingEntry } from "./live";
-import { addEntries, addShift, emptyLive, rate, summarize, withEventAt, withoutEventsAt } from "./live";
+import { addEntries, addFrames, addShift, emptyLive, rate, scriptsOf, summarize, withEventAt, withoutEventsAt } from "./live";
 
 const entry = (fields: Partial<TimingEntry>): TimingEntry => ({
   interactionId: 1,
@@ -18,6 +19,27 @@ const slowClick = [
   entry({ interactionId: 7, name: "pointerup", startTime: 2000, duration: 320, processingStart: 2002, processingEnd: 2003, target: "button#slow" }),
   entry({ interactionId: 7, name: "click", startTime: 2004, duration: 312, processingStart: 2004, processingEnd: 2304, target: "button#slow" }),
 ];
+
+// The frame the slow click's handler ran in.
+const slowFrame: FrameEntry = {
+  startTime: 2002,
+  duration: 310,
+  styleAndLayoutStart: 2310,
+  blockingDuration: 260,
+  firstUIEventTimestamp: 2000,
+  scripts: [
+    {
+      invoker: "BUTTON#slow.onclick",
+      startTime: 2004,
+      duration: 300,
+      forcedStyleAndLayoutDuration: 0,
+      sourceURL: "http://localhost:5173/demo/main.ts",
+      sourceFunctionName: "",
+      sourceCharPosition: 988,
+    },
+  ],
+};
+const laterFrame = (n: number): FrameEntry => ({ ...slowFrame, startTime: 3000 + n * 100, duration: 60, scripts: [] });
 
 describe("summarize", () => {
   it("counts a slow click handler as processing, not as the pointerup's presentation delay", () => {
@@ -69,6 +91,40 @@ describe("withEventAt", () => {
   it("keeps the newest 50 event times", () => {
     const times = Array.from({ length: 51 }, (_, at) => at).reduce(withEventAt, []);
     expect([times.length, times[0], times.at(-1)]).toEqual([50, 1, 50]);
+  });
+});
+
+describe("addFrames", () => {
+  it("keeps the longest frame as the worst", () => {
+    const live = addFrames(addFrames(emptyLive(0), [slowFrame]), [laterFrame(1)]);
+    expect(live.worstFrame).toBe(slowFrame);
+  });
+
+  it("skips a frame from before the reset", () => {
+    const live = emptyLive(2500);
+    expect(addFrames(live, [slowFrame])).toBe(live);
+  });
+});
+
+describe("scriptsOf", () => {
+  it.each([
+    ["the frame arrives before the events", (live = emptyLive(0)) => addEntries(addFrames(live, [slowFrame]), slowClick)],
+    ["the events arrive before the frame", (live = emptyLive(0)) => addFrames(addEntries(live, slowClick), [slowFrame])],
+  ])("names the script behind an interaction when %s", (_, build) => {
+    const live = build();
+    expect(scriptsOf(live, live.last!)).toMatchObject({ longest: { invoker: "BUTTON#slow.onclick" }, scriptTime: 300 });
+  });
+
+  it("still names it after more frames than the window keeps", () => {
+    const busy = Array.from({ length: 12 }, (_, n) => laterFrame(n));
+    const live = busy.reduce((next, frame) => addFrames(next, [frame]), addFrames(addEntries(emptyLive(0), slowClick), [slowFrame]));
+    expect(scriptsOf(live, live.worst!)?.longest?.invoker).toBe("BUTTON#slow.onclick");
+    expect(live.frames).toHaveLength(11);
+  });
+
+  it("names nothing for an interaction with no long frame", () => {
+    const live = addEntries(emptyLive(0), [entry({})]);
+    expect(scriptsOf(live, live.last!)).toBeUndefined();
   });
 });
 

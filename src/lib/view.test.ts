@@ -12,15 +12,23 @@ it("draws every row before anything has reported, and says how to get a value", 
     ["TTFB", "waiting", "none", 0],
     ["FCP", "waiting", "none", 0],
     ["LCP", "waiting", "none", 5],
-    ["INP", "interact first", "none", 7],
+    ["INP", "interact first", "none", 8],
     ["CLS", "waiting", "none", 3],
   ]);
   expect(view.live.map((m) => [m.name, m.value, m.rating, m.details.length])).toEqual([
-    ["last interaction", "interact", "none", 5],
+    ["last interaction", "interact", "none", 9],
     ["worst interaction", "interact", "none", 1],
+    ["worst frame", "none yet", "none", 3],
     ["layout shift", "0.000", "good", 0],
   ]);
   expect(view.page.flatMap((m) => m.details).every((d) => d.text === "-" && d.title === "")).toBe(true);
+});
+
+it("describes every row, with the good value that web-vitals rates against", () => {
+  const view = toPanelView(empty);
+
+  expect([...view.page, ...view.live].filter((m) => m.about === "").map((m) => m.name)).toEqual([]);
+  expect(view.page[2]?.about).toContain("Good is 2500 ms or less.");
 });
 
 it("fills a reported row by label, and leaves a detail the row lacks as a dash", () => {
@@ -44,5 +52,6 @@ it("fills a reported row by label, and leaves a detail the row lacks as a dash",
     value: "320 ms",
     rating: "needs-improvement",
     details: [{ label: "target", text: "button#slow", title: "button#slow" }],
+    about: expect.any(String),
   });
 });

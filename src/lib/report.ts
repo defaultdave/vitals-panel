@@ -2,8 +2,10 @@
  * Builds what the panel shows and what the Copy button copies from one
  * snapshot, so the two cannot disagree. Pure functions, no browser APIs.
  */
+import type { FrameEntry } from "./frames";
+import { describeSource, longestScript } from "./frames";
 import type { Interaction, LiveReading } from "./live";
-import { rate } from "./live";
+import { rate, scriptsOf } from "./live";
 import type { Layout, PageReading, Row } from "./rows";
 import { ms, PAGE_LAYOUT } from "./rows";
 
@@ -29,13 +31,30 @@ const CLS_THRESHOLDS = [0.1, 0.25] as const;
 
 /** Detail labels per live row, fixed so the panel never changes size. */
 export const LIVE_LAYOUT: Layout = [
-  ["last interaction", ["target", "type", "1 input delay", "2 processing duration", "3 presentation delay"]],
+  [
+    "last interaction",
+    [
+      "target",
+      "type",
+      "1 input delay",
+      "2 processing duration",
+      "3 presentation delay",
+      "longest script",
+      "its invoker",
+      "script time",
+      "forced style and layout",
+    ],
+  ],
   ["worst interaction", ["target"]],
+  ["worst frame", ["blocking duration", "longest script", "its invoker"]],
   ["layout shift", []],
 ];
 
-function interactionRow(name: string, interaction: Interaction | undefined): Row | undefined {
+const NO_SCRIPT = "n/a";
+
+function interactionRow(name: string, live: LiveReading, interaction: Interaction | undefined): Row | undefined {
   if (!interaction) return undefined;
+  const scripts = scriptsOf(live, interaction);
   return {
     name,
     value: ms(interaction.duration),
@@ -46,6 +65,26 @@ function interactionRow(name: string, interaction: Interaction | undefined): Row
       ["1 input delay", ms(interaction.inputDelay)],
       ["2 processing duration", ms(interaction.processing)],
       ["3 presentation delay", ms(interaction.presentation)],
+      ["longest script", describeSource(scripts?.longest)],
+      ["its invoker", scripts?.longest?.invoker ?? NO_SCRIPT],
+      ["script time", ms(scripts?.scriptTime)],
+      ["forced style and layout", ms(scripts?.forcedStyleAndLayout)],
+    ],
+  };
+}
+
+// A frame has no Core Web Vitals threshold, so it is shown without a rating.
+function frameRow(frame: FrameEntry | undefined): Row | undefined {
+  if (!frame) return undefined;
+  const script = longestScript(frame);
+  return {
+    name: "worst frame",
+    value: ms(frame.duration),
+    rating: "none",
+    details: [
+      ["blocking duration", ms(frame.blockingDuration)],
+      ["longest script", describeSource(script)],
+      ["its invoker", script?.invoker ?? NO_SCRIPT],
     ],
   };
 }
@@ -53,12 +92,13 @@ function interactionRow(name: string, interaction: Interaction | undefined): Row
 /**
  * Formats the live reading as rows, keyed by the names in `LIVE_LAYOUT`.
  * @param live - The reading since the last reset.
- * @returns A row per name. An interaction row is missing until one is seen.
+ * @returns A row per name. An interaction row or the frame row is missing until one is seen.
  */
 export function toLiveRows(live: LiveReading): Record<string, Row | undefined> {
   return {
-    "last interaction": interactionRow("last interaction", live.last),
-    "worst interaction": interactionRow("worst interaction", live.worst),
+    "last interaction": interactionRow("last interaction", live, live.last),
+    "worst interaction": interactionRow("worst interaction", live, live.worst),
+    "worst frame": frameRow(live.worstFrame),
     "layout shift": {
       name: "layout shift",
       value: live.shift.toFixed(3),
@@ -70,10 +110,9 @@ export function toLiveRows(live: LiveReading): Record<string, Row | undefined> {
 
 function rowLines(name: string, row: Row | undefined, width: number): string[] {
   if (!row) return [`${name.padEnd(width)}  not reported yet`];
-  return [
-    `${name.padEnd(width)}  ${row.value}  ${row.rating}`,
-    ...row.details.map(([label, value]) => `  ${label}: ${value}`),
-  ];
+  // A row with no rating, such as a frame, is written without one.
+  const rating = row.rating === "none" ? "" : `  ${row.rating}`;
+  return [`${name.padEnd(width)}  ${row.value}${rating}`, ...row.details.map(([label, value]) => `  ${label}: ${value}`)];
 }
 
 /**

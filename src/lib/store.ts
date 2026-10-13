@@ -6,11 +6,13 @@
  * Mounting, unmounting and mounting again does not register them twice.
  */
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals/attribution";
+import type { FrameEntry } from "./frames";
+import { withoutFramesAt } from "./frames";
 import type { ShiftEntry, TimingEntry } from "./live";
-import { addEntries, addShift, emptyLive, withEventAt, withoutEventsAt } from "./live";
+import { addEntries, addFrames, addShift, emptyLive, withEventAt, withoutEventsAt } from "./live";
 import type { VitalsSnapshot } from "./report";
 import type { VitalsMetric } from "./rows";
-import { applyMetric, EMPTY_PAGE } from "./rows";
+import { addPageFrames, applyMetric, EMPTY_PAGE } from "./rows";
 
 // The lowest threshold the Event Timing API accepts. Shorter interactions are never reported.
 const MIN_EVENT_DURATION_MS = 16;
@@ -50,6 +52,25 @@ function toTimingEntry(entry: PerformanceEventTiming): TimingEntry {
   };
 }
 
+function toFrameEntry(entry: PerformanceLongAnimationFrameTiming): FrameEntry {
+  return {
+    startTime: entry.startTime,
+    duration: entry.duration,
+    styleAndLayoutStart: entry.styleAndLayoutStart,
+    blockingDuration: entry.blockingDuration,
+    firstUIEventTimestamp: entry.firstUIEventTimestamp,
+    scripts: entry.scripts.map((script) => ({
+      invoker: script.invoker,
+      startTime: script.startTime,
+      duration: script.duration,
+      forcedStyleAndLayoutDuration: script.forcedStyleAndLayoutDuration,
+      sourceURL: script.sourceURL,
+      sourceFunctionName: script.sourceFunctionName,
+      sourceCharPosition: script.sourceCharPosition,
+    })),
+  };
+}
+
 function observeLive() {
   const supported = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
   if (supported.includes("event")) {
@@ -67,6 +88,17 @@ function observeLive() {
       setSnapshot({ ...snapshot, live });
     });
     shifts.observe({ type: "layout-shift" });
+  }
+  if (supported.includes("long-animation-frame")) {
+    const frames = new PerformanceObserver((list) => {
+      const entries = (list.getEntries() as PerformanceLongAnimationFrameTiming[]).map(toFrameEntry);
+      // The page view takes every frame: `web-vitals` counts the panel's interactions toward INP too.
+      setSnapshot({
+        page: addPageFrames(snapshot.page, entries),
+        live: addFrames(snapshot.live, withoutFramesAt(entries, ignoredEventTimes)),
+      });
+    });
+    frames.observe({ type: "long-animation-frame" });
   }
 }
 
@@ -128,8 +160,9 @@ export function onVitalsMetric(listener: (metric: VitalsMetric) => void): () => 
 }
 
 /**
- * Keeps interactions with one element out of the live reading. The panel calls
- * this for itself, so pressing Copy does not show up as the last interaction.
+ * Keeps interactions with one element, and the long animation frames they
+ * start, out of the live reading. The panel calls this for itself, so pressing
+ * Copy does not show up as the last interaction.
  * @param element - The element to leave out. A shadow host covers its whole tree.
  * @returns A function that stops leaving it out.
  */
