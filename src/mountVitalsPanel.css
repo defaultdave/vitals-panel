@@ -66,7 +66,8 @@
 }
 
 .toggle:focus-visible,
-.action:focus-visible {
+.action:focus-visible,
+.info:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 2px;
 }
@@ -102,11 +103,84 @@
   color: #aaa;
 }
 
-.metric dt span,
+.value,
 .metric dd span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The same size whatever the row, so a row is no taller with it than without. */
+.info {
+  all: unset;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #555;
+  border-radius: 50%;
+  color: #aaa;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.info:hover {
+  border-color: #aaa;
+  color: #eee;
+}
+
+/*
+ * A description, shown in the top layer by the browser when its info button is
+ * pressed. The first rule keeps it out of the panel in a browser without
+ * popovers, which drops the second rule because it cannot read the selector.
+ */
+.about {
+  display: none;
+}
+
+.about:popover-open {
+  display: block;
+  box-sizing: border-box;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  background: #111;
+  color: #eee;
+  font-weight: 400;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}
+
+/*
+ * Beside its row, to the left of the panel, or below or above the row where the
+ * window is too narrow. Without anchor positioning the browser centers it.
+ */
+@supports (anchor-scope: --row) and (position-area: left) {
+  .metric,
+  .heading {
+    anchor-name: --row;
+    anchor-scope: --row;
+  }
+
+  .about:popover-open {
+    position-anchor: --row;
+    position-area: left span-bottom;
+    /* Upward from a row near the bottom of the window, then below or above the row. */
+    position-try-fallbacks: flip-block, bottom, top;
+    inset: auto;
+    /* 18px: the panel's 10px of padding and an 8px gap. */
+    margin: 0 18px;
+  }
 }
 
 .value[data-rating="good"] {

@@ -6,7 +6,12 @@
  * first view, and afterwards only changes the data of text nodes that already
  * exist, and only while the panel is open. Nothing is added or removed as values arrive, so the panel stays one
  * size and adds no layout shift to the page it is measuring.
+ *
+ * Each row and each section has an info button that opens a description of it.
+ * The description is a popover: the browser draws it above the page, outside
+ * the panel's box, so opening one changes nothing about the panel's layout.
  */
+import { SECTION_ABOUT } from "./lib/about";
 import { copyText } from "./lib/clipboard";
 import { toReportText } from "./lib/report";
 import type { VitalsMetric } from "./lib/rows";
@@ -63,6 +68,16 @@ function adoptStyles(root: ShadowRoot) {
   }
 }
 
+// The button opens the note without any script: `popovertarget` names it, and the browser closes it on Escape or a click elsewhere.
+// The id only has to be unique in this panel's shadow root, which is where the browser looks it up.
+function infoFor(name: string, about: string): [button: HTMLElement, note: HTMLElement] {
+  const id = `about-${name.replaceAll(" ", "-")}`;
+  return [
+    el("button", { type: "button", class: "info", popovertarget: id, "aria-label": `About ${name}` }, "i"),
+    el("div", { id, class: "about", popover: "auto" }, about),
+  ];
+}
+
 type Fill<View> = (view: View) => void;
 
 function metricRow(view: MetricView): [row: HTMLElement, fill: Fill<MetricView>] {
@@ -84,7 +99,9 @@ function metricRow(view: MetricView): [row: HTMLElement, fill: Fill<MetricView>]
     });
   };
   fill(view);
-  return [el("div", { class: "metric" }, el("dt", {}, view.name, valueCell), ...details.map((d) => d.line)), fill];
+  const [info, note] = infoFor(view.name, view.about);
+  const heading = el("dt", {}, el("span", { class: "name" }, view.name, info), valueCell, note);
+  return [el("div", { class: "metric" }, heading, ...details.map((d) => d.line)), fill];
 }
 
 function metricList(views: MetricView[]): [list: HTMLElement, fill: Fill<MetricView[]>] {
@@ -101,10 +118,11 @@ function metricList(views: MetricView[]): [list: HTMLElement, fill: Fill<MetricV
  *
  * "Page view" is Google's `web-vitals` library, attribution build: TTFB, FCP,
  * LCP, INP and CLS as Chrome defines them. INP and CLS there are the worst seen
- * so far, so they only ever go up, and they restart on a navigation.
+ * so far, so a good reading after a bad one changes nothing, and they restart on a navigation.
  *
  * "Since reset" is the panel's own window over the same browser entries: the
- * last interaction, the worst one and the layout shift since Reset was pressed.
+ * last interaction, the worst one, the longest long animation frame and the
+ * layout shift since Reset was pressed.
  *
  * Both are lab readings on this device, not field data. Mount one panel per
  * page. On a server, where there is no document, this does nothing.
@@ -122,6 +140,9 @@ export function mountVitalsPanel({ open = true, log = false }: VitalsPanelOption
   const copyLabel = new Text();
   const statusMessage = new Text();
 
+  const [pageInfo, pageNote] = infoFor("Page view", SECTION_ABOUT.page);
+  const [liveInfo, liveNote] = infoFor("Since reset", SECTION_ABOUT.live);
+
   const toggle = el("button", { type: "button", class: "toggle" }, toggleLabel);
   const copy = el("button", { type: "button", class: "action copy" }, copyLabel);
   const reset = el("button", { type: "button", class: "action" }, "Reset");
@@ -131,10 +152,15 @@ export function mountVitalsPanel({ open = true, log = false }: VitalsPanelOption
     el(
       "div",
       { role: "group", "aria-label": "Page view, from web-vitals" },
-      el("div", { class: "heading" }, "Page view"),
+      el("div", { class: "heading" }, el("span", { class: "name" }, "Page view", pageInfo), pageNote),
       pageList,
     ),
-    el("div", { role: "group", "aria-label": "Since reset" }, el("div", { class: "heading" }, liveHeading, reset), liveList),
+    el(
+      "div",
+      { role: "group", "aria-label": "Since reset" },
+      el("div", { class: "heading" }, el("span", { class: "name" }, liveHeading, liveInfo), liveNote, reset),
+      liveList,
+    ),
   );
   // Groups with labels, not headings: the panel sits inside someone else's page outline.
   const panel = el(

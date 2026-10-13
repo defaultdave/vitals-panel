@@ -3,6 +3,7 @@
  * layout table is in the result whether or not its metric has reported, so the
  * panel is the same size from the first paint. Pure functions, no browser APIs.
  */
+import { ROW_ABOUT } from "./about";
 import type { VitalsSnapshot } from "./report";
 import { LIVE_LAYOUT, toLiveRows } from "./report";
 import type { Layout, Rating, Row } from "./rows";
@@ -24,6 +25,8 @@ export interface MetricView {
   value: string;
   rating: Rating;
   details: DetailView[];
+  /** What the metric is, for its info button. The same for every snapshot. */
+  about: string;
 }
 
 /** Everything in the panel that changes as readings arrive. */
@@ -37,7 +40,8 @@ const NO_DETAIL = "-";
 
 // INP has no value until the first click, tap or key press.
 const pageWaiting = (name: string) => (name === "INP" ? "interact first" : "waiting");
-const liveWaiting = () => "interact";
+// A frame under 50 ms is never reported, so a page can go without one.
+const liveWaiting = (name: string) => (name === "worst frame" ? "none yet" : "interact");
 
 function toMetricViews(
   layout: Layout,
@@ -56,6 +60,7 @@ function toMetricViews(
         text: details.get(label) ?? NO_DETAIL,
         title: details.get(label) ?? "",
       })),
+      about: ROW_ABOUT[name] ?? "",
     };
   });
 }

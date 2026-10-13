@@ -60,6 +60,19 @@ it("hides the readings when the toggle is pressed, and starts hidden when asked 
   expect(mount({ open: false }).queryByRole("group", { name: "Since reset" })).toBeNull();
 });
 
+it("gives every row and both sections an info button that opens a description", () => {
+  const panel = mount();
+  const about = (name: string) => {
+    const button = panel.getByRole("button", { name: `About ${name}` });
+    return (button.getRootNode() as ShadowRoot).getElementById(button.getAttribute("popovertarget") ?? "");
+  };
+
+  expect(panel.getAllByRole("button", { name: /^About / })).toHaveLength(11);
+  expect(about("INP")?.textContent).toMatch(/^Interaction to Next Paint/);
+  expect(about("worst frame")?.getAttribute("popover")).toBe("auto");
+  expect(about("Since reset")?.textContent).toMatch(/^The panel's own reading/);
+});
+
 it("removes the panel when the returned function is called", () => {
   mount();
   unmount();
